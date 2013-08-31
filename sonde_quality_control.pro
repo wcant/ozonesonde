@@ -4,7 +4,7 @@ FUNCTION read_de1, file
   nlines=FILE_LINES(file)
   dummy=STRARR(nlines)
   READF, lun, dummy
-  
+  FREE_LUN, lun
 ;Parameters to keep track of:
 ;1. Flight number (fltnum)
 ;2. Date  (date)
@@ -34,7 +34,12 @@ FUNCTION read_de1, file
   FOR i=0, N_ELEMENTS(search_strings)-1 DO BEGIN
   
     string_indx=WHERE(STRPOS(dummy[*], search_strings[i]) NE -1)
-    data[i]=STRMID(dummy[string_indx], 30, 15)
+    
+    IF string_indx EQ -1 THEN data[i]=!VALUES.F_NAN ELSE BEGIN
+    
+      data[i]=STRMID(dummy[string_indx], 30, 15)
+  
+    ENDELSE
   
   ENDFOR
   
@@ -43,14 +48,49 @@ END
 
 
 
-
 PRO Sonde_quality_control
 
-file=FILE_SEARCH('C:\Users\Wes Cantrell\Dropbox\Sonde Data\Huntsville\Database_rebuild\HU786\DATA\','*.de1', count=nfiles)
+files=FILE_SEARCH('C:\Users\Wes Cantrell\Dropbox\Sonde Data\Huntsville\Database_rebuild\HU???\DATA\','*.de1', count=nfiles)
 
-data=read_de1(file)
+data=STRARR(nfiles, 17)
+
+FOR j=0, nfiles-1 DO BEGIN
+
+  data[j,*]=read_de1(files[j])
+
+ENDFOR
+
+date=data[*,1]
+time=data[*,2]
+fr_corr=FLOAT(data[*,14])
+
+month=STRMID(date, 3, 2)
+day=STRMID(date, 0, 2)
+year=STRMID(date, 6, 4)
+
+SET_PLOT, 'PS'
+
+DEVICE, filename='C:\Users\Wes Cantrell\Dropbox\Ozonesonde Station\Flowrate_correction\flowrate_correction_analysis.ps'  $
+                  , /color;, xoffset=.5,yoffset=.5,xsize=7.5,ysize=10 $
+                  ;,/inches,/landscape
+;!p.charsize=1.2 & !p.thick=2.0 & !x.thick=2.0 & !y.thick=2.0 
+;!p.charthick=2.0 & !p.multi=[0,1,1]
+
+;define color table
+color_table_ps
+
+;Flowrate correction Histogram
+Histoplot, fr_corr $
+         , xtitle='Flowrate Correction (%)'  $
+         ;, xrange=[0,100] $
+         , yrange=[0,0.2] $
+         , /FREQUENCY $
+         , binsize=0.1 
 
 
+
+
+DEVICE, /CLOSE
 
 stop
 END
